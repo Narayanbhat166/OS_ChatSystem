@@ -3,7 +3,7 @@ Deadline : 28th March
 
 # Requirements
 1. Shared Memory
-2. Synchronization (Semaphres)
+2. Synchronization (Semaphores)
 3. UI(front end)
 
 # Implemented
