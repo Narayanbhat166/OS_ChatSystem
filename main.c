@@ -3,20 +3,8 @@
 #include <string.h>
 //Semaphores
 #include "semaphore_header.h"
-
 //Shared Memory
 #include "shm_header.h"
-
-void writeMessage(/*shared_mem_segment,*/ char *msg)
-{
-	// insert producer code here
-	// the process becomes the producer
-}
-char *readMessage(/*shared_mem_segment*/)
-{
-	// insert consumer code here
-	// the process becomes the consumer
-}
 
 int main(int argc, char *argv[])
 {
@@ -25,6 +13,7 @@ int main(int argc, char *argv[])
 	int shm_id = 0;
 
 	char User1[20], User2[20];
+	createSemaphores();
 
 	if (argc != 2)
 	{
