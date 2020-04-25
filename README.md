@@ -7,8 +7,9 @@ Deadline : 28th March
 3. UI(front end)
 
 # Implemented
-1.
+1.Shared Memory
 2.
+3.
 
 # Description
   The Application must have the above criteria. readers must be blocked when writer is writing(Readers Writer problem)
