@@ -1,6 +1,7 @@
 #include<assert.h>
 #include<semaphore.h>
 #include<fcntl.h>
+#include"shm_header.h"
 sem_t* rw_mutex = NULL;
 sem_t* mutex = NULL;
 int read_count = 0;
@@ -41,7 +42,7 @@ char *readMessage(int shm_id)
 		if (read_count == 0)
 			sem_post(rw_mutex);
 		sem_post(mutex);
-	}while(true);
+	}while(1);
 }
 
 
