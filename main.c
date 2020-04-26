@@ -6,26 +6,31 @@
 //Semaphores
 #include <semaphore.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #define waitForLock sem_wait
 #define releaseLock sem_post
-
+#define RWMUTEX "/read-write_mutex"
 //Shared Memory
 #include "shm_header.h"
-
-void createSemaphores(sem_t *lock)
-{
-	lock = sem_open("/read-write_mutex", O_CREAT, 644, 1);
-}
 
 int main(int argc, char *argv[])
 {
 	//Address of our shared memory buffer
+	errno = 0;
 	char *buffer = NULL;
 	int shm_id = 0;
 
 	//binary semaphore
-	sem_t *lock = sem_open("/read-write_mutex", O_CREAT, 644, 1);
+	sem_t *lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
+	if (lock == SEM_FAILED)
+	{
+		printf("sem_open: Error number = %d\n", errno);
+		perror("Error is:");
+		printf("Creating new semaphore and destroying old one...\n");
+		sem_unlink(RWMUTEX);
+		lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
+	}
 
 	//file to store the chat history
 	FILE *history = NULL;
@@ -83,7 +88,7 @@ int main(int argc, char *argv[])
 	//clear the buffer
 	strcpy(buffer, "");
 
-	while (1)
+	do
 	{
 		waitForLock(lock);
 		{
@@ -106,11 +111,12 @@ int main(int argc, char *argv[])
 			printf("%s has released the lock\n", myName);
 		}
 		releaseLock(lock);
-	}
+	} while (1);
 
 	//Release all the resources
 	fclose(history);
 	shmdt(buffer);
+	sem_unlink(RWMUTEX);
 
 	return 0;
 }
