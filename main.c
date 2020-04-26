@@ -4,20 +4,8 @@
 #include <time.h>
 //Semaphores
 #include "semaphore_header.h"
-
 //Shared Memory
 #include "shm_header.h"
-
-void writeMessage(/*shared_mem_segment,*/ char *msg)
-{
-	// insert producer code here
-	// the process becomes the producer
-}
-char *readMessage(/*shared_mem_segment*/)
-{
-	// insert consumer code here
-	// the process becomes the consumer
-}
 
 int main(int argc, char *argv[])
 {
@@ -27,6 +15,7 @@ int main(int argc, char *argv[])
 	FILE *history = NULL;
 
 	char User1[20], User2[20];
+	createSemaphores();
 
 	//below code segment is for the setup
 	if (argc != 2)
