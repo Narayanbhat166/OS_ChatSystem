@@ -2,20 +2,35 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 //Semaphores
-#include "semaphore_header.h"
+#include <semaphore.h>
+#include <fcntl.h>
+
+#define waitForLock sem_wait
+#define releaseLock sem_post
+
 //Shared Memory
 #include "shm_header.h"
+
+void createSemaphores(sem_t *lock)
+{
+	lock = sem_open("/read-write_mutex", O_CREAT, 644, 1);
+}
 
 int main(int argc, char *argv[])
 {
 	//Address of our shared memory buffer
 	char *buffer = NULL;
 	int shm_id = 0;
+
+	//binary semaphore
+	sem_t *lock = sem_open("/read-write_mutex", O_CREAT, 644, 1);
+
+	//file to store the chat history
 	FILE *history = NULL;
 
-	char User1[20], User2[20];
-	createSemaphores();
+	char myName[20], myFriendName[20];
 
 	//below code segment is for the setup
 	if (argc != 2)
@@ -25,27 +40,27 @@ int main(int argc, char *argv[])
 		shm_id = AllocateSharedMemory(shm_size);
 		buffer = (char *)MapSharedMemory(shm_id);
 		puts("You are User:1 Enter Your Name:");
-		scanf("%s", User1);
-		strcpy(buffer, User1);
+		scanf("%s", myName);
+		strcpy(buffer, myName);
 
 		printf("Use id: %d to get another user connected\n", shm_id);
 
 		//Wait for Another user to get connected
-		while (strcmp(buffer, User1) == 0)
+		while (strcmp(buffer, myName) == 0)
 			;
 
-		strcpy(User2, buffer);
+		strcpy(myFriendName, buffer);
 		history = fopen("chathistory.txt", "w");
 		if (history == NULL)
 		{
 			printf("File not opened\n");
 		}
 
-		time_t now;
-		time(&now);
-		fprintf(history, "Chat History:");
-		fprintf(history, "Conversation between %s and %s\n", User1, User2);
 		//debugging goes down here
+		// time_t now;
+		// time(&now);
+		// fprintf(history, "Chat History:");
+		// fprintf(history, "Conversation between %s and %s\n", User1, User2);
 	}
 	else
 	{
@@ -53,23 +68,45 @@ int main(int argc, char *argv[])
 		shm_id = atoi(argv[1]);
 		buffer = (char *)MapSharedMemory(shm_id);
 		puts("You are User:2 Enter your Name:");
-		scanf("%s", User2);
-		strcpy(User1, buffer);
-		strcpy(buffer, User2);
+		scanf("%s", myName);
 
-		//open the file in append mode
-		//history = fopen("chathistory.txt", "a");
+		strcpy(myFriendName, buffer);
+		strcpy(buffer, myName);
 
 		//debugging goes down here
+		// open the file in append mode
+		// history = fopen("chathistory.txt", "a");
 	}
 
-	printf("%s and %s are now connected\n", User1, User2);
+	printf("%s and %s are now connected\n", myName, myFriendName);
+
+	//clear the buffer
+	strcpy(buffer, "");
+
 	while (1)
 	{
-	}
+		waitForLock(lock);
+		{
+			printf("%s has acquired the lock\n", myName);
+			//read the reply if its length is greater than zero
+			if (strlen(buffer) > 0)
+			{
+				printf("%s: ", myFriendName);
+				printf("%s\n", buffer);
 
-	// if memory is not full, allow writing
-	// if memory is full, extend the memory segment
+				//clear the buffer
+				strcpy(buffer, "");
+			}
+
+			//write my reply for my friends message
+			printf("%s:", myName);
+			char message[1024];
+			scanf("%s", message);
+			strcpy(buffer, message);
+			printf("%s has released the lock\n", myName);
+		}
+		releaseLock(lock);
+	}
 
 	//Release all the resources
 	fclose(history);
