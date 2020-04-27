@@ -1,57 +1,107 @@
-#if !defined(__GNU_LIBRARY__) || defined(_SEM_SEMUN_UNDEFINED)
-union semun {
-	int val;
-	// value for SETVAL
-	struct semid_ds *buf;
-	// buffer for IPC_STAT, IPC_SET
-	unsigned short *array; // array for GETALL, SETALL
-	struct seminfo *__buf; // buffer for IPC_INFO
-};
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
-#include <syslog.h>
-#include <sys/sem.h>
 
 //Semaphores
 #include <semaphore.h>
 #include <fcntl.h>
-#include <errno.h>
+#include<errno.h>
 
+#define RWMUTEX1 "/read-write_mutex1"
+#define RWMUTEX2 "/read-write_mutex2"
 //Shared Memory
 #include "shm_header.h"
+sem_t *lock1,*lock2;
 
-int CreateSemaphoreSet(int n, short *vals);
-void DeleteSemaphoreSet(int id);
-void LockSemaphore(int id, int i);
-void UnlockSemaphore(int id, int i);
-// The various semaphores used in the program.
-enum
+void releaseLock(int uid)
 {
-	SEM_USER_1, // Indicates it’s the first person’s turn.
-	SEM_USER_2	// Indicates it’s the second person’s turn.
-};
+	int test;
+	assert(uid<3);
+	if(uid == 1)
+	{
+		test = sem_post(lock1);
+		if(test == -1)
+		{
+			perror("sem_post(lock1) ");
+		}
+	}
+	else
+	{
+		test = sem_post(lock2);
+		if(test == -1)
+		{
+			perror("sem_post(lock2)");
+		}
+	}
+}
+
+void waitForLock(int uid)
+{
+	int test;
+	assert(uid<3);
+	if(uid == 1)
+	{
+		test = sem_wait(lock1);
+		if(test == -1)
+		{
+			perror("sem_wait(lock1) ");
+		}
+	}
+	else
+	{
+		test = sem_wait(lock2);
+		if(test == -1)
+		{
+			perror("sem_wait(lock2)");
+		}
+	}
+}
+	
+void printLockValues(char c)
+{
+	int lock1_value,lock2_value;
+	sem_getvalue(lock1,&lock1_value);
+	sem_getvalue(lock2,&lock2_value);
+	if(c == 'w')
+	{
+		printf("Before first wait, value of lock1 = %d\n",lock1_value);
+		printf("Before first wait, value of lock2 = %d\n",lock2_value);
+	}
+	else
+	{
+		printf("After release, value of lock1 = %d\n",lock1_value);
+		printf("After release, value of lock2 = %d\n",lock2_value);
+	}
+}
 
 int main(int argc, char *argv[])
 {
 	//Address of our shared memory buffer
+	errno = 0;
 	char *buffer = NULL;
 	int shm_id = 0;
+	int lock_value = -1000;
 
 	//binary semaphore
-	int idSem;
-	short vals[2]; // Values for initialising the semaphores.
-	int mySem;	   // Semaphore indicating our user.
-	int yourSem;   // Semaphore indicating the other user.
+	/*sem_t *lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
+	if(lock == SEM_FAILED)
+	{
+		printf("sem_open: Error number = %d\n",errno);
+		perror("Error is:");
+		printf("Creating new semaphore and destroying old one...\n");
+		sem_unlink(RWMUTEX);
+		lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
+	}*/
 
 	//file to store the chat history
 	FILE *history = NULL;
 
 	char myName[20], myFriendName[20];
+	int my_id,friend_id;
+	char s[3];	// dummy to consume the newline character 
+	
+	printf("Welcome to OSChat - A Simplistic Chat Application\nType \\exit to quit the program\n");
 
 	//below code segment is for the setup
 	if (argc != 2)
@@ -60,39 +110,30 @@ int main(int argc, char *argv[])
 		int shm_size = 1024;
 		shm_id = AllocateSharedMemory(shm_size);
 		buffer = (char *)MapSharedMemory(shm_id);
-
-		vals[SEM_USER_1] = 0;
-		vals[SEM_USER_2] = 0;
-		idSem = CreateSemaphoreSet(2, vals);
-
-		// Record which semaphores we need to wait one and signal.
-		mySem = SEM_USER_1;
-		yourSem = SEM_USER_2;
-
-		// Save the semaphore id in our shared memory so the other
-		// user can get it.
-		*((int *)buffer) = idSem;
-		printf("Use id: %d to get another user connected\n", shm_id);
-
-		//Wait for Another user to get connected
-		while (*((int *)buffer) == idSem)
-			;
-
+		sem_unlink(RWMUTEX1);
+		sem_unlink(RWMUTEX2);
+		lock1 = sem_open(RWMUTEX1, O_CREAT, 0666, 0);
+		lock2 = sem_open(RWMUTEX2, O_CREAT, 0666, 0);
 		puts("You are User:1 Enter Your Name:");
 		scanf("%s", myName);
 		strcpy(buffer, myName);
+		my_id = 1;
+		friend_id = 2;
 
+		printf("Use id: %d to get another user connected\n", shm_id);
+
+		//Wait for Another user to get connected
+		printf("Waiting for other user...\n");
 		while (strcmp(buffer, myName) == 0)
 			;
 
 		strcpy(myFriendName, buffer);
-		strcpy(buffer, "");
-
-		// history = fopen("chathistory.txt", "w");
-		// if (history == NULL)
-		// {
-		// 	printf("File not opened\n");
-		// }
+		fgets(s,3,stdin);
+		history = fopen("chathistory.txt", "w");
+		if (history == NULL)
+		{
+			printf("File not opened\n");
+		}
 
 		//debugging goes down here
 		// time_t now;
@@ -105,26 +146,18 @@ int main(int argc, char *argv[])
 		//Shared memory created by other user just map it
 		shm_id = atoi(argv[1]);
 		buffer = (char *)MapSharedMemory(shm_id);
-
-		idSem = *((int *)buffer);
-
-		//signal my friend that i have read the sem id
-		strcpy(buffer, "");
-
+		lock2 = sem_open(RWMUTEX2, O_CREAT, 0666, 0);	// attach the semaphores to second process
+		lock1 = sem_open(RWMUTEX1, O_CREAT, 0666, 0);
 		puts("You are User:2 Enter your Name:");
 		scanf("%s", myName);
 
 		strcpy(myFriendName, buffer);
 		strcpy(buffer, myName);
-
-		while (strcmp(buffer, myName) == 0)
-			;
-
-		strcpy(buffer, "");
-		mySem = SEM_USER_2;
-		yourSem = SEM_USER_1;
-
-		UnlockSemaphore(idSem, yourSem);
+		fgets(s,3,stdin);
+		my_id = 2;
+		friend_id = 1;
+		releaseLock(friend_id);
+		printLockValues('r');
 		//debugging goes down here
 		// open the file in append mode
 		// history = fopen("chathistory.txt", "a");
@@ -133,98 +166,49 @@ int main(int argc, char *argv[])
 	printf("%s and %s are now connected\n", myName, myFriendName);
 
 	//clear the buffer
+	strcpy(buffer, "");
 
-	do
+	for(;;)
 	{
-		LockSemaphore(idSem, mySem);
-		{
-			if(strcmp(buffer,"\\exit\n") == 0)
-				break;
-			//read the reply if its length is greater than zero
-			if (strlen(buffer) > 0)
-			{
-				printf("%s: ", myFriendName);
-				printf("%s", buffer);
-
-				//clear the buffer
-				strcpy(buffer, "");
-			}
-
-			//write my reply for my friends message
-			printf("%s:", myName);
-			char message[1024];
-			fgets(message, 1024, stdin);
-			strcpy(buffer, message);
-		}
-		UnlockSemaphore(idSem, yourSem);
-		if(strcmp(buffer,"\\exit\n") == 0)
+		printLockValues('w');
+		waitForLock(my_id);
+		if(strcmp(buffer,"\\exit\n") == 0)	// has the other user quit
 			break;
-	} while (1);
+		printf("%s has acquired the lock\n", myName);
+		//read the reply if its length is greater than zero
+		if (strlen(buffer) > 0)
+		{
+			printf("%s: ", myFriendName);
+			printf("%s", buffer);
 
-	//Release all the resources
-	fclose(history);
-	shmdt(buffer);
+			//clear the buffer
+			strcpy(buffer, "");
+		}
+		//releaseLock(lock);
+		//sem_getvalue(lock,&lock_value);
+		//printf("After first release, value of lock = %d\n",lock_value);
 
-	if(mySem == SEM_USER_1)
-		DeleteSemaphoreSet(idSem);
+		//write my reply for my friends message
+		printf("%s: ", myName);
+		//char message[1024];
+		//fflush(stdin);
+		fgets(buffer,1024,stdin);
+		//strcpy(buffer, message);
+		printf("%s has released the lock\n", myName);
+		releaseLock(friend_id);
+		printLockValues('r');
+		if(strcmp(buffer,"\\exit\n") == 0)	// has the other user quit
+			break;
+	}
 
+	//First user has to release all the resources
+	if(my_id == 1)
+	{
+		fclose(history);
+		shmdt(buffer);
+		sem_unlink(RWMUTEX1);
+		sem_unlink(RWMUTEX2);
+	}
 	return 0;
 }
 
-int CreateSemaphoreSet(int n, short *vals)
-{
-	union semun arg;
-	int id;
-	assert(n > 0);
-	/* You need at least one! */
-	assert(vals != NULL); /* And they need initialising! */
-	id = semget(IPC_PRIVATE, n, SHM_R | SHM_W);
-	arg.array = vals;
-	semctl(id, 0, SETALL, arg);
-	return id;
-}
-/**
-* Frees up the given semaphore set.
-*
-* @param id Id of the semaphore group.
-*/
-void DeleteSemaphoreSet(int id)
-{
-	if (semctl(id, 0, IPC_RMID, NULL) == -1)
-	{
-		perror("Error releasing semaphore!");
-		exit(EXIT_FAILURE);
-	}
-}
-/**
-* Locks a semaphore within a semaphore set.
-*
-* @param id Semaphore set it belongs to.
-* @param i
-Actual semaphore to lock.
-*
-* @note If it’s already locked, you’re put to sleep.
-*/
-void LockSemaphore(int id, int i)
-{
-	struct sembuf sb;
-	sb.sem_num = i;
-	sb.sem_op = -1;
-	sb.sem_flg = SEM_UNDO;
-	semop(id, &sb, 1);
-}
-/**
-* Unlocks a semaphore within a semaphore set.
-*
-* @param id Semaphore set it belongs to.
-* @param i
-Actual semaphore to unlock.
-*/
-void UnlockSemaphore(int id, int i)
-{
-	struct sembuf sb;
-	sb.sem_num = i;
-	sb.sem_op = 1;
-	sb.sem_flg = SEM_UNDO;
-	semop(id, &sb, 1);
-}
