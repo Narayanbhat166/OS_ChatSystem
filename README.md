@@ -8,7 +8,7 @@ Deadline : 28th March
 
 # Implemented
 1.Shared Memory
-2.
+2.Synchronization
 3.
 
 # Description
