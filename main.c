@@ -1,4 +1,3 @@
-
 #if !defined(__GNU_LIBRARY__) || defined(_SEM_SEMUN_UNDEFINED)
 union semun {
 	int val;
@@ -23,9 +22,6 @@ union semun {
 #include <fcntl.h>
 #include <errno.h>
 
-#define waitForLock sem_wait
-#define releaseLock sem_post
-#define RWMUTEX "/read-write_mutex"
 //Shared Memory
 #include "shm_header.h"
 
@@ -142,6 +138,8 @@ int main(int argc, char *argv[])
 	{
 		LockSemaphore(idSem, mySem);
 		{
+			if(strcmp(buffer,"\\exit\n") == 0)
+				break;
 			//read the reply if its length is greater than zero
 			if (strlen(buffer) > 0)
 			{
@@ -159,14 +157,16 @@ int main(int argc, char *argv[])
 			strcpy(buffer, message);
 		}
 		UnlockSemaphore(idSem, yourSem);
+		if(strcmp(buffer,"\\exit\n") == 0)
+			break;
 	} while (1);
 
 	//Release all the resources
 	fclose(history);
 	shmdt(buffer);
-	sem_unlink(RWMUTEX);
 
-	DeleteSemaphoreSet(idSem);
+	if(mySem == SEM_USER_1)
+		DeleteSemaphoreSet(idSem);
 
 	return 0;
 }
