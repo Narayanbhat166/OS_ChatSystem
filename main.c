@@ -22,15 +22,15 @@ int main(int argc, char *argv[])
 	int shm_id = 0;
 
 	//binary semaphore
-	sem_t *lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
-	if (lock == SEM_FAILED)
-	{
-		printf("sem_open: Error number = %d\n", errno);
-		perror("Error is:");
-		printf("Creating new semaphore and destroying old one...\n");
-		sem_unlink(RWMUTEX);
-		lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
-	}
+	sem_t *lock = NULL;
+	// if (lock == SEM_FAILED)
+	// {
+	// 	printf("sem_open: Error number = %d\n", errno);
+	// 	perror("Error is:");
+	// 	printf("Creating new semaphore and destroying old one...\n");
+	// 	sem_unlink(RWMUTEX);
+	// 	lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
+	// }
 
 	//file to store the chat history
 	FILE *history = NULL;
@@ -45,6 +45,7 @@ int main(int argc, char *argv[])
 		shm_id = AllocateSharedMemory(shm_size);
 		buffer = (char *)MapSharedMemory(shm_id);
 		puts("You are User:1 Enter Your Name:");
+		lock = sem_open(RWMUTEX, O_CREAT, 0666, 1);
 		scanf("%s", myName);
 		strcpy(buffer, myName);
 
@@ -77,6 +78,7 @@ int main(int argc, char *argv[])
 
 		strcpy(myFriendName, buffer);
 		strcpy(buffer, myName);
+		lock = sem_open(RWMUTEX, 1);
 
 		//debugging goes down here
 		// open the file in append mode
