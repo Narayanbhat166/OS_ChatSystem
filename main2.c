@@ -16,20 +16,46 @@ sem_t *lock1,*lock2;
 
 void releaseLock(int uid)
 {
+	int test;
 	assert(uid<3);
 	if(uid == 1)
-		sem_post(lock1);
+	{
+		test = sem_post(lock1);
+		if(test == -1)
+		{
+			perror("sem_post(lock1) ");
+		}
+	}
 	else
-		sem_post(lock2);
+	{
+		test = sem_post(lock2);
+		if(test == -1)
+		{
+			perror("sem_post(lock2)");
+		}
+	}
 }
 
 void waitForLock(int uid)
 {
+	int test;
 	assert(uid<3);
 	if(uid == 1)
-		sem_wait(lock1);
+	{
+		test = sem_wait(lock1);
+		if(test == -1)
+		{
+			perror("sem_wait(lock1) ");
+		}
+	}
 	else
-		sem_wait(lock2);
+	{
+		test = sem_wait(lock2);
+		if(test == -1)
+		{
+			perror("sem_wait(lock2)");
+		}
+	}
 }
 	
 void printLockValues(char c)
@@ -116,7 +142,6 @@ int main(int argc, char *argv[])
 		//Shared memory created by other user just map it
 		shm_id = atoi(argv[1]);
 		buffer = (char *)MapSharedMemory(shm_id);
-		sem_unlink(RWMUTEX2);
 		lock2 = sem_open(RWMUTEX2, O_CREAT, 0666, 0);
 		lock1 = sem_open(RWMUTEX1, O_CREAT, 0666, 0);
 		puts("You are User:2 Enter your Name:");
@@ -162,9 +187,8 @@ int main(int argc, char *argv[])
 		printf("%s: ", myName);
 		char message[1024];
 		//fflush(stdin);
-		//fgets(buffer,1023,stdin);
-		scanf("%s",message);
-		strcpy(buffer, message);
+		fgets(buffer,1024,stdin);
+		//strcpy(buffer, message);
 		printf("%s has released the lock\n", myName);
 		releaseLock(friend_id);
 		printLockValues('r');
@@ -172,12 +196,14 @@ int main(int argc, char *argv[])
 			break;
 	}
 
-	//Release all the resources
-	fclose(history);
-	shmdt(buffer);
-	sem_unlink(RWMUTEX1);
-	sem_unlink(RWMUTEX2);
-
+	//First user has to release all the resources
+	if(my_id == 1)
+	{
+		fclose(history);
+		shmdt(buffer);
+		sem_unlink(RWMUTEX1);
+		sem_unlink(RWMUTEX2);
+	}
 	return 0;
 }
 
