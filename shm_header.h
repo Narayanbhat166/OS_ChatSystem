@@ -11,7 +11,6 @@
 int AllocateSharedMemory(int n)
 {
     assert(n > 0);
-    printf("Allocated Shared memory of %d bytes\n", n);
     return shmget(IPC_PRIVATE, n, IPC_CREAT | SHM_R | SHM_W);
 }
 
@@ -27,6 +26,6 @@ void *MapSharedMemory(int id)
     assert(id != 0);
     addr = shmat(id, NULL, 0);
     shmctl(id, IPC_RMID, NULL); /*mark segment to be destroyed.When all processes are detached from the memory segment, it will be freed */
-    puts("Mapped shared memory");
+    printf("Mapped shared memory to address %p\n", addr);
     return addr;
 }
