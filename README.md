@@ -13,3 +13,5 @@
 # Description
   The Application must have the above criteria. readers must be blocked when writer is writing(Readers Writer problem)
 changes/access to the Shared memory -> Critical section
+
+  Only one user can be allowed to write while the other is blocked,i.e. ,both users cannot write at the same time.
